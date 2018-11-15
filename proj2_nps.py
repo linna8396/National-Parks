@@ -9,8 +9,8 @@ import json
 
 state_url_front = "https://www.nps.gov/state/"
 state_url_end = "/index.htm"
-google_base_url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
-google_geolocation_base_url = "https://maps.googleapis.com/maps/api/geocode/json"
+nearbysearch_base_url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
+geolocation_base_url = "https://maps.googleapis.com/maps/api/geocode/json"
 ## you can, and should add to and modify this class any way you see fit
   ## 这个class可以改
 ## you can add attributes and modify the __init__ parameters,
@@ -69,7 +69,8 @@ def get_sites_for_state(state_abbr):
         for national_site in national_sites_list:
             try:
                 site_name = national_site.find("h3").text
-                national_sites.append(site_name)
+                site_type = national_site.find("h2").text
+                national_sites.append(site_name + " " + site_type)
             except:
                 pass
         cache.set(state_url, national_sites, 30)
@@ -83,6 +84,28 @@ def params_unique_combination(baseurl, params_d, private_keys=["key"]):
             res.append("{}-{}".format(k, params_d[k]))
     return baseurl + "_".join(res)
 
+def get_geolocation_info(national_site):
+    params_dic = {"key": google_places_key, "address": national_site}
+    unique_identifier = params_unique_combination(geolocation_base_url, params_dic)
+    cache = Cache("geolocation_info.json")
+    geolocation_json = cache.get(unique_identifier)
+
+    if not geolocation_json:
+        print("I get this data from the Google API.")
+        result = requests.get(geolocation_base_url, params = params_dic)
+        geolocation_json = json.loads(result.text)
+        cache.set(unique_identifier, geolocation_json, 30)
+
+    lng = 0
+    lat = 0
+    try:
+        geolocation = geolocation_json["results"][0]['geometry']['location']
+        lng = geolocation['lng']
+        lat = geolocation['lat']
+    except:
+        pass
+    return lng, lat
+
 ## Must return the list of NearbyPlaces for the specifite NationalSite
 ## param: a NationalSite object
 ## returns: a list of NearbyPlaces within 10km of the given site
@@ -93,41 +116,29 @@ def params_unique_combination(baseurl, params_d, private_keys=["key"]):
 ## 返回一串10公里以内的NearbyPlaces
 ## 没有的话就返回空list
 def get_nearby_places_for_site(national_site):
-    geolocation_params_dic = {"key": google_places_key, "address": national_site}
-    geolocation_unique_identifier = params_unique_combination(google_geolocation_base_url, geolocation_params_dic)
-    cache = Cache("geolocation_info.json")
-    geolocation = cache.get(geolocation_unique_identifier)
+    lng, lat = get_geolocation_info(national_site)
+    params_dic = { "key": google_places_key,
+                   "location": str(lat) + "," + str(lng),
+                   "radius": 10000 }
+    unique_identifier = params_unique_combination(nearbysearch_base_url, params_dic)
+    cache = Cache("nearby_places.json")
+    places_json = cache.get(unique_identifier)
 
-    if not geolocation:
+    if not places_json:
         print("I get this data from the Google API.")
-        result = requests.get(google_geolocation_base_url, params = geolocation_params_dic)
-        result_text = result.text
-        places_json = json.loads(result_text)
-        cache.set(geolocation_unique_identifier, places_json, 30)
-        print(places_json)
+        result = requests.get(nearbysearch_base_url, params = params_dic)
+        places_json = json.loads(result.text)
+        cache.set(unique_identifier, places_json, 30)
 
-    lng = geolocation["results"][0]["geometry"]["location"]["lng"]
-    print(lng)
-    # params_dic = {"api_key": FLICKR_KEY, "tags": tag, "per_page": num_photos}
-    # cache = Cache("national_sites.json")
-    # national_sites = cache.get(state_url)
-    #
-    # if not national_sites:
-    #     national_sites = []
-    #     print("I retrieve the data from online")
-    #     web_data = requests.get(state_url).text
-    #
-    #     national_sites_soup = BeautifulSoup(web_data, "html.parser")
-    #     national_sites_list = national_sites_soup.find_all("li", class_ = "clearfix")
-    #
-    #     for national_site in national_sites_list:
-    #         try:
-    #             site_name = national_site.find("h3").text
-    #             national_sites.append(site_name)
-    #         except:
-    #             pass
-    #     cache.set(state_url, national_sites, 30)
-    # return national_sites
+    nearby_places_list = []
+    try:
+        places = places_json["results"]
+        for place in places:
+            nearby_places_list.append(place['name'])
+    except:
+        pass
+
+    return nearby_places_list
 
 ## Must plot all of the NationalSites listed for the state on nps.gov
 ## Note that some NationalSites might actually be located outside the state.
@@ -158,4 +169,5 @@ def plot_nearby_for_site(site_object):
 
 print(get_sites_for_state("al"))
 
-get_nearby_places_for_site("Birmingham Civil Rights")
+print(get_nearby_places_for_site("Birmingham Civil Rights National Monument"))
+print(get_nearby_places_for_site("Freedom Riders National Monument"))
