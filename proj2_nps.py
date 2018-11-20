@@ -5,10 +5,11 @@ from secrets import google_places_key
 from bs4 import BeautifulSoup
 from alternate_advanced_caching import Cache
 import requests
+from states_dict import abbr_dict
 import json
 
-state_url_front = "https://www.nps.gov/state/"
-state_url_end = "/index.htm"
+nps_home_url = "https://www.nps.gov"
+
 nearbysearch_base_url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
 geolocation_base_url = "https://maps.googleapis.com/maps/api/geocode/json"
 ## you can, and should add to and modify this class any way you see fit
@@ -20,18 +21,22 @@ geolocation_base_url = "https://maps.googleapis.com/maps/api/geocode/json"
 ##
 ## the starter code is here just to make the tests run (and fail)
 class NationalSite():
-    def __init__(self, type, name, desc, url=None):
+    def __init__(self, type, name, desc, url = None):
         self.type = type
         self.name = name
         self.description = desc
         self.url = url
 
         # needs to be changed, obvi.
-        self.address_street = '123 Main St.'
-        self.address_city = 'Smallville'
-        self.address_state = 'KS'
-        self.address_zip = '11111'
+        self.address_street = ''
+        self.address_city = ''
+        self.address_state = ''
+        self.address_zip = ''
+        self.lat = 0
+        self.lng = 0
 
+    def __str__(self):
+        return "{} ({}): {}, {}, {} {}".format(self.name, self.type, self.address_street, self.address_city, self.address_state, self.address_zip)
 ## you can, and should add to and modify this class any way you see fit
   ## 这个class也可以随便改
 ## you can add attributes and modify the __init__ parameters,
@@ -43,6 +48,8 @@ class NationalSite():
 class NearbyPlace():
     def __init__(self, name):
         self.name = name
+    def __str__(self):
+        print(self.name)
 
 ## Must return the list of NationalSites for the specified state
 ## param: the 2-letter state abbreviation, lowercase
@@ -53,28 +60,89 @@ class NearbyPlace():
 
 ## 也就是说，pass一个state进来，要返回一串nationalsites（并不知道是啥）
 ## 哦，知道了，就是nps.gov上的那些公园啥的
-def get_sites_for_state(state_abbr):
-    state_url = state_url_front + state_abbr + state_url_end
+def website_scraping_and_cache(url):
     cache = Cache("national_sites.json")
-    national_sites = cache.get(state_url)
+    result = cache.get(url)
 
-    if not national_sites:
-        national_sites = []
-        print("I retrieve this data online.")
-        web_data = requests.get(state_url).text
+    if not result:
+        result = requests.get(url).text
+        cache.set(url, result, 30)
 
-        national_sites_soup = BeautifulSoup(web_data, "html.parser")
-        national_sites_list = national_sites_soup.find_all("li", class_ = "clearfix")
+    return BeautifulSoup(result, 'html.parser')
 
-        for national_site in national_sites_list:
+def get_sites_for_state(state_abbr):
+    national_sites = []
+
+    # scrape the homepage and get the national sites url for the given state
+    homepage_soup = website_scraping_and_cache(nps_home_url)
+    all_states = homepage_soup.find("ul", class_= "dropdown-menu")
+    state_url = all_states.find('a', string = abbr_dict.get(state_abbr.upper()))['href']
+
+    # scrape the national sites page for the given state_url,
+    # get the information for each national site,
+    # and create a NationalSite class to store those information
+    state_sites_soup = website_scraping_and_cache(nps_home_url + state_url)
+    sites_wrapper = state_sites_soup.find("ul", id = "list_parks")
+    sites_list = sites_wrapper.find_all("li", class_ = "clearfix")
+    for site in sites_list:
+        name = site.find("h3").text.strip()
+        type = site.find("h2").text.strip()
+
+        description = site.find("p").text.strip()
+        # here we find the url for the specific national site
+        site_url = nps_home_url + site.find("a")["href"].strip()
+        # scrape the webpage of the specific national site to get the location info
+        site_soup = website_scraping_and_cache(site_url)
+        try:
+            # handle the special issue of Death Valley in CA
+            if site_soup.find("span", itemprop = "postOfficeBoxNumber"):
+                # 这里不知道是不是要排成一行比较好
+                street = "P.O. Box " + site_soup.find("span", itemprop = "postOfficeBoxNumber").text.strip()
+            else:
+                street = site_soup.find("span", itemprop="streetAddress").text.strip()
+
+            city = site_soup.find("span", itemprop = "addressLocality").text.strip()
+            state = site_soup.find("span", itemprop = "addressRegion").text.strip()
+            zip = site_soup.find("span", itemprop = "postalCode").text.strip()
+
+        except: # the location info hides in the next page level
+            # get the url of the contact info page and scrape it to get the location info
+            # print(name + "does not have mailing address")
             try:
-                site_name = national_site.find("h3").text
-                site_type = national_site.find("h2").text
-                national_sites.append(site_name + " " + site_type)
+                print(name)
+                print(site_url)
+                contact_info_url = nps_home_url + site_soup.find("a", string = "Contact the Park")["href"]
+                contact_info_soup = website_scraping_and_cache(contact_info_url)
+                contact_info = contact_info_soup.find("div", class_ = "ArticleTextGroup").text
+                # find the index of where the address part start in the bulk of text
+                address_idx = contact_info.find("Mailing Address")
+                contact_info = contact_info[address_idx:]
+                contact_info = contact_info.split("\n")[1:]
+                contact_info_clean = [item for item in contact_info if item is not '']
+                street = contact_info_clean[0].strip()
+                for each_street in contact_info_clean[1:-1]:
+                    street +=  " " + each_street.strip()
+                city = contact_info_clean[-1].split()[0][:-1]
+                state = contact_info_clean[-1].split()[1]
+                zip = contact_info_clean[-1].split()[2]
             except:
-                pass
-        cache.set(state_url, national_sites, 30)
+                street = ""
+                city = ""
+                state = ""
+                zip = ""
+
+        site_class = NationalSite(type, name, description, site_url)
+        site_class.address_street = street
+        site_class.address_city = city
+        site_class.address_state = state
+        site_class.address_zip = zip
+        national_sites.append(site_class)
+
+    # for c in national_sites:
+    #     print(c)
+    print(len(national_sites))
     return national_sites
+
 
 def params_unique_combination(baseurl, params_d, private_keys=["key"]):
     alphabetized_keys = sorted(params_d.keys())
@@ -116,7 +184,9 @@ def get_geolocation_info(national_site):
 ## 返回一串10公里以内的NearbyPlaces
 ## 没有的话就返回空list
 def get_nearby_places_for_site(national_site):
-    lng, lat = get_geolocation_info(national_site)
+    lng, lat = get_geolocation_info(national_site.name + " " + national_site.type)
+    if lng == 0 and lat == 0:
+        print("wrong location info for " + str(national_site))
     params_dic = { "key": google_places_key,
                    "location": str(lat) + "," + str(lng),
                    "radius": 10000 }
@@ -134,7 +204,7 @@ def get_nearby_places_for_site(national_site):
     try:
         places = places_json["results"]
         for place in places:
-            nearby_places_list.append(place['name'])
+            nearby_places_list.append(NearbyPlace(place['name']))
     except:
         pass
 
@@ -167,7 +237,10 @@ def plot_sites_for_state(state_abbr):
 def plot_nearby_for_site(site_object):
     pass
 
-print(get_sites_for_state("al"))
-
-print(get_nearby_places_for_site("Birmingham Civil Rights National Monument"))
-print(get_nearby_places_for_site("Freedom Riders National Monument"))
+# for key in abbr_dict:
+#     print(key)
+#     get_sites_for_state(key)
+#     print("-" * 100)
+# get_sites_for_state("ca")
+#print(get_nearby_places_for_site("Birmingham Civil Rights National Monument"))
+#print(get_nearby_places_for_site("Freedom Riders National Monument"))
