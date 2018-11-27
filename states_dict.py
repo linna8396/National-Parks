@@ -1,4 +1,4 @@
-us_state_abbrev = {
+abbr_dict = {
     'AL': 'Alabama',
     'AK': 'Alaska',
     'AZ': 'Arizona',
