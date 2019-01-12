@@ -1,14 +1,23 @@
-*Linna Qiao, Project 2, SI 508*
+*Linna Qiao, University of Michigan, School of Information, Data Science*
 
 # Project Overview
-This project is about getting various kinds of information about national sites in different states.
+In this project, I:
+* Scrape the U.S. National Parks' official website for information about the listed parks such as their names, locations, introduction, etc.
+* Used Google Maps API to get the geolocation data for the national parks, search nearby places, for example, hotels and restaurants, around the parks, and get the geolocation data for those place, too.
+* Used Plot.ly to visualize the parks and their nearby places on the map according to users' requirements.
 
 Here you can:
+*  get a list of all the national parks in a state by providing the state's abbreviation.
+*  plot all the national parks in the state you just indicate on a map.
+*  get a list of 20 nearby places around a certain national park by providing the sequence number of that site in the previous national parks list.
+*  plot those nearby places on a map.
 
-*  get a list of all the national sites in a state by providing the state's abbreviation.
-*  plot all the national sites in the state you just indicate on a map.
-*  get a list of 20 nearby places of a national site by providing the sequence number of that site in the previous national sites list.
-*  plot all the  nearby places of a national site you just find on a map.
+Below are some sample visualizations you will get:
+
+#### National Sites in Michigan
+![national_sites](national_sites.png?raw=true "National Sites in Michigan")
+#### Places Near Sleeping Bear Dunes National Lakeshore
+![nearby_places](nearby_places.png?raw=true "Places Near Sleeping Bear Dunes National Lakeshore")
 
 # Introduction to the Files
 There are a total of 4 python files you need to run this program and do the things mentioned above. These files are:
@@ -21,15 +30,15 @@ Of those 4 files, `pro2_nps.py` is the main file you should run to perform all t
 
 There are also 3 JSON files that will be generated during you run the main file. These files are just used for caching purpose and will not affect running the main file in any way.
 
-# All Dependencies to Install Before You Run the Code
-1. Google API Key
+# Dependencies to Install Before You Run the Code
+## 1. Google API Key
 
 To run this program and do all functions described in the project overview, you need to set up your access for the Google Places API. You will need to get a Google API key following instructions on this website:
 https://developers.google.com/places/web-service/get-api-key
 
 After you get the Google API key, you should copy & paste the key into the `secrets.py`, and you are all set.
 
-2. Plot.ly
+## 2. Plot.ly
 
 Plotly is a graphing service that you can work with from Python. It allows you to create many different kinds of graphs, including the ones we will see in this program.
 
@@ -37,7 +46,7 @@ First, you need to go to the official site of Plot.ly: https://plot.ly/ and crea
 
 To be able to use Plot.ly from your python programs, you will need to install the Plot.ly module and set up your installation with your private API key. Here are the instructions:
 
-## Installation
+### 1) Installation
 To install Plotly's python package, use the package manager pip inside your terminal.
 If you don't have pip installed on your machine, click https://pip.pypa.io/en/latest/installing/ for pip's installation instructions.
 
@@ -47,7 +56,7 @@ or
 
 `$ sudo pip install plotly`
 
-## Set Credentials
+### 2) Set Credentials
 After installing the Plot.ly package, you're ready to fire up python:
 
 `$ python`
@@ -72,7 +81,7 @@ The initialization step places a special .plotly/.credentials file in your home 
 }
 ```
 
-3. Having BeautifulSoup on Your Computer:
+## 3. BeautifulSoup:
 
 Since you should already set up `pip` when you finish setting up the Plot.ly. You can also use `pip` to install BeautifulSoup if you don't have it on your computer.
 
@@ -82,7 +91,7 @@ Open your terminal window and type in:
 
 and you are all set!
 
-#Instructions
+# Instructions
 Great! Now you are ready to explore and use the program.
 
 This program is interactive. When you run it in the terminal, you can type in different commands to instruct the program to do things you want it to do. Here's a list of commands that you can enter and their corresponding results:
